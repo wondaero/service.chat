@@ -1,0 +1,35 @@
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import { getUserGreeting } from "./users"; // 작성한 함수 임포트
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: "*" }, // 프론트엔드 연결 허용
+});
+
+io.on("connection", (socket) => {
+  console.log("사용자 접속:", socket.id);
+
+  socket.on("chat message", (msg) => {
+    io.emit("chat message", msg); // 모든 클라이언트에게 전송
+  });
+});
+
+//user쪽
+app.post("/user/:name", (req, res) => {
+  const { name } = req.params;
+  const result = getUserGreeting(name);
+  res.json(result);
+});
+// API 엔드포인트
+app.get("/user/:name", (req, res) => {
+  const { name } = req.params;
+  const result = getUserGreeting(name);
+  res.json(result);
+});
+
+httpServer.listen(3000, () => {
+  console.log("채팅 서버가 http://localhost:3000 에서 실행 중입니다.");
+});
