@@ -3,12 +3,19 @@ import { Router } from "express";
 const router = Router();
 
 // [인증 관련]
+router.get("/login", (req, res) => {
+  // 1. req.body에서 아이디/비번 추출
+  // 2. 유저 테이블 조회 (DB)
+  // 3. 비밀번호 검증
+  // 4. 세션 생성 또는 JWT 토큰 발행
+  res.json({ message: "200" });
+});
 router.post("/login", (req, res) => {
   // 1. req.body에서 아이디/비번 추출
   // 2. 유저 테이블 조회 (DB)
   // 3. 비밀번호 검증
   // 4. 세션 생성 또는 JWT 토큰 발행
-  res.json({ message: "Login successful" });
+  res.json({ res: 200 });
 });
 router.get("/getUserList", (req, res) => {
   res.json([
