@@ -15,7 +15,7 @@ router.post("/login", (req, res) => {
   // 2. 유저 테이블 조회 (DB)
   // 3. 비밀번호 검증
   // 4. 세션 생성 또는 JWT 토큰 발행
-  res.json({ res: 200 });
+  res.json({ logined: true });
 });
 router.get("/getUserList", (req, res) => {
   res.json([

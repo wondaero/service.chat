@@ -1,23 +1,15 @@
 import express from "express";
 import { createServer } from "http";
-import { Server } from "socket.io";
+import { initSocket } from "./socket"; // 분리한 소켓 모듈 임포트
+
 import userRouter from "./users/router"; // 작성한 함수 임포트
 import cors from "cors";
 
 const app = express();
-app.use(express.json());
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: { origin: "*" }, // 프론트엔드 연결 허용
-});
 
-io.on("connection", (socket) => {
-  console.log("사용자 접속:", socket.id);
+app.use(express.json());
 
-  socket.on("chat message", (msg) => {
-    io.emit("chat message", msg); // 모든 클라이언트에게 전송
-  });
-});
 
 const corsOptions = {
   // 클라이언트가 요청을 보내는 정확한 주소와 포트를 지정하세요
