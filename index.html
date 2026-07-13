@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
-</head>
-<body>
+  </head>
+  <body>
     <input type="text" id="idInput" placeholder="ID 입력" />
     <input type="password" id="pwInput" placeholder="비밀번호 입력" />
     <button id="loginBtn">로그인</button>
@@ -15,62 +15,80 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
+      // 서버의 주소와 포트(예: http://localhost:3000)를 지정하여 연결
 
-        // 서버의 주소와 포트(예: http://localhost:3000)를 지정하여 연결
-        
+      let socket;
 
-        let socket;
+      document.getElementById("loginBtn").addEventListener("click", () => {
+        const value_id = document.getElementById("idInput").value;
+        const value_pw = document.getElementById("pwInput").value;
 
-        document.getElementById('loginBtn').addEventListener('click', () => {
-            fetch('http://localhost:3000/user/login', {method: 'POST'})
-            .then(response => response.json())
-            .then((data) => {
-                if(!data.logined) return;
-
-                console.log(444);
-
-                if(socket){
-                    console.log('이미 연결된 소켓이 있음');
-                    return;
-                }
-
-                socket = io("http://localhost:3000");
-
-                // 1. 연결 성공 이벤트
-                socket.on("connect", () => {
-                    console.log("서버와 연결 성공! 연결 ID:", socket.id);
-                });
-
-                // 2. 서버로부터 메시지 수신 (이벤트명: 'message')
-                socket.on("message", (data) => {
-                    console.log("서버에서 받은 데이터:", data);
-                });
-
-                // 3. 서버로 데이터 전송
-                const sendToServer = () => {
-                    socket.emit("chat", { msg: "안녕 서버야" });
-                };
-
-                // 4. 연결 종료 처리
-                socket.on("disconnect", () => {
-                    console.log("연결이 끊어졌습니다.");
-                });
-
-                socket.on("welcome-msg", (data) => {
-                    console.log("서버로부터 받은 메시지:", data);
-                });
-
-            })
+        if (!value_id || !value_pw) {
+          alert("로그인 정보를 입력해주세요.");
+          return;
+        }
+        fetch("http://localhost:3000/user/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // 2. 객체를 JSON 문자열로 변환해서 body에 담아야 합니다.
+          body: JSON.stringify({
+            id: value_id,
+            pw: value_pw,
+          }),
         })
+          .then((response) => response.json())
+          .then((data) => {
+            if (!data.logined) return;
 
-        document.getElementById('sendBtn').addEventListener('click', () => {
-            const message = document.getElementById('messageInput').value;
+            window.localStorage.setItem("fuzMessengerToken", data.token);
 
-            console.log(333);
+            if (socket) {
+              console.log("이미 연결된 소켓이 있음");
+              return;
+            }
 
-            // "login-data"라는 이름의 채널로 객체를 보냄
-            socket.emit("chat message", { userId: "testUser", status: "online" });
-        })
+            socket = io("http://localhost:3000", {
+              auth: {
+                token: data.token,
+              },
+            });
+
+            // 1. 연결 성공 이벤트
+            socket.on("connect", () => {
+              console.log("서버와 연결 성공! 연결 ID:", socket.id);
+            });
+
+            // 2. 서버로부터 메시지 수신 (이벤트명: 'message')
+            socket.on("message", (data) => {
+              console.log("서버에서 받은 데이터:", data);
+            });
+
+            // 3. 서버로 데이터 전송
+            const sendToServer = () => {
+              socket.emit("chat", { msg: "안녕 서버야" });
+            };
+
+            // 4. 연결 종료 처리
+            socket.on("disconnect", () => {
+              console.log("연결이 끊어졌습니다.");
+            });
+
+            socket.on("welcome-msg", (data) => {
+              console.log("서버로부터 받은 메시지:", data);
+            });
+          });
+      });
+
+      document.getElementById("sendBtn").addEventListener("click", () => {
+        const message = document.getElementById("messageInput").value;
+
+        console.log(333);
+
+        // "login-data"라는 이름의 채널로 객체를 보냄
+        socket.emit("chat message", { userId: "testUser", status: "online" });
+      });
     </script>
-</body>
+  </body>
 </html>

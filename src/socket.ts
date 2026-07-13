@@ -1,7 +1,6 @@
 import { Server } from "socket.io";
 import { Server as HttpServer } from "http";
 
-
 const corsOptions = {
   // 클라이언트가 요청을 보내는 정확한 주소와 포트를 지정하세요
   origin: "http://127.0.0.1:5500",
@@ -11,7 +10,7 @@ const corsOptions = {
 
 export const initSocket = (httpServer: HttpServer) => {
   const io = new Server(httpServer, {
-    cors: { origin: corsOptions }, // 필요시 corsOptions 설정
+    cors: corsOptions, // 필요시 corsOptions 설정
   });
 
   io.use((socket, next) => {
