@@ -9,6 +9,7 @@ const app = express();
 const httpServer = createServer(app);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const corsOptions = {
   // 클라이언트가 요청을 보내는 정확한 주소와 포트를 지정하세요
