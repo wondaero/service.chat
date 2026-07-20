@@ -1,17 +1,28 @@
 import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+
+const SECRET_KEY = "test1";
 
 export const authMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
-  const token = req.headers.authorization;
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    res.status(401).json({ message: "인증 토큰이 없습니다." });
-    return; // TypeScript에서는 여기서 return을 명시해주는 것이 좋습니다.
+  if (!authHeader) {
+    return res.status(401).json({ message: "인증 토큰이 없습니다." });
   }
 
-  // 인증 로직...
-  next();
+  const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+
+    (req as any).user = decoded;
+
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "유효하지 않거나 만료된 토큰입니다." });
+  }
 };

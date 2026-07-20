@@ -22,6 +22,22 @@
       border: 0;
       border-top: 1px solid #ddd;
     }
+
+    .input-label {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-label.ast strong:after {
+      content: '*';
+      color: orange;
+    }
+
+
+
+    .input-label input {
+      height: 32px;
+    }
   </style>
 </head>
 
@@ -29,12 +45,22 @@
   <div>
     <h2>1. 회원가입</h2>
     <form class="form-style" action="http://localhost:3000/user/signup" method="POST">
-      <input type="text" name="account" placeholder="아이디 입력" />
-      <input type="password" name="pw" placeholder="비밀번호 입력" />
-      <input type="text" name="name" placeholder="이름 입력" />
-      <input type="text" name="phone" placeholder="연락처 입력" />
-      <input type="text" name="dept" placeholder="부서 입력" />
-      <input type="text" name="roles" placeholder="직책 입력" />
+      <label class="input-label ast">
+        <strong>이메일 주소</strong>
+        <input type="email" name="email" />
+      </label>
+      <label class="input-label ast">
+        <strong>비밀번호</strong>
+        <input type="password" name="pw" />
+      </label>
+      <label class="input-label ast">
+        <strong>이름</strong>
+        <input type="text" name="name" />
+      </label>
+      <label class="input-label">
+        <strong>연락처</strong>
+        <input type="tel" name="phone" />
+      </label>
       <button>회원가입</button>
     </form>
   </div>
@@ -42,29 +68,30 @@
   <div>
     <h2>2. 로그인</h2>
     <div class="form-style">
-      <input type="text" name="account" placeholder="아이디" />
-      <input type="password" name="pw" placeholder="비밀번호" />
-      <button>로그인</button>
+      <label class="input-label">
+        <strong>아이디</strong>
+        <input type="text" name="email" id="loginEmailInput" placeholder="아이디" />
+      </label>
+      <label class="input-label">
+        <strong>비밀번호</strong>
+        <input type="password" name="pw" id="loginPwInput" placeholder="비밀번호" />
+      </label>
+      <button id="loginBtn">로그인</button>
     </div>
+    <p id="welcomeTxt"></p>
   </div>
-  <hr />
+  <div>
+    <h2>3. 로그아웃</h2>
+    <button id="logoutBtn">로그아웃</button>
+  </div>
 
-  <input type="text" id="idInput" placeholder="ID 입력" />
-  <input type="password" id="pwInput" placeholder="비밀번호 입력" />
-  <button id="loginBtn">로그인</button>
-  <hr />
-  <input type="text" id="messageInput" />
-  <button id="sendBtn">전송</button>
 
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="./common/socket.js"></script> -->
   <script>
-    // 서버의 주소와 포트(예: http://localhost:3000)를 지정하여 연결
-
-    let socket;
-
     document.getElementById("loginBtn").addEventListener("click", () => {
-      const value_id = document.getElementById("idInput").value;
-      const value_pw = document.getElementById("pwInput").value;
+      const value_id = document.getElementById("loginEmailInput").value;
+      const value_pw = document.getElementById("loginPwInput").value;
 
       if (!value_id || !value_pw) {
         alert("로그인 정보를 입력해주세요.");
@@ -77,60 +104,31 @@
         },
         // 2. 객체를 JSON 문자열로 변환해서 body에 담아야 합니다.
         body: JSON.stringify({
-          id: value_id,
+          email: value_id,
           pw: value_pw,
         }),
       })
-        .then((response) => response.json())
-        .then((data) => {
-          if (!data.logined) return;
-
-          window.localStorage.setItem("fuzMessengerToken", data.token);
-
-          if (socket) {
-            console.log("이미 연결된 소켓이 있음");
-            return;
+        .then(response => {
+          console.log(response);
+          if (!response.ok) {
+            alert('아이디 또는 비밀번호가 잘못되었습니다.');
+            return null;
           }
+          return response.json();
+        })
+        .then((resData) => {
+          if (!resData) return;
 
-          socket = io("http://localhost:3000", {
-            auth: {
-              token: data.token,
-            },
-          });
+          window.localStorage.setItem("fuzDataToken", resData.token);
 
-          // 1. 연결 성공 이벤트
-          socket.on("connect", () => {
-            console.log("서버와 연결 성공! 연결 ID:", socket.id);
-          });
-
-          // 2. 서버로부터 메시지 수신 (이벤트명: 'message')
-          socket.on("message", (data) => {
-            console.log("서버에서 받은 데이터:", data);
-          });
-
-          // 3. 서버로 데이터 전송
-          const sendToServer = () => {
-            socket.emit("chat", { msg: "안녕 서버야" });
-          };
-
-          // 4. 연결 종료 처리
-          socket.on("disconnect", () => {
-            console.log("연결이 끊어졌습니다.");
-          });
-
-          socket.on("welcome-msg", (data) => {
-            console.log("서버로부터 받은 메시지:", data);
-          });
+          document.getElementById("welcomeTxt").innerText = resData.data.name + "님 환영합니다.";
         });
     });
 
-    document.getElementById("sendBtn").addEventListener("click", () => {
-      const message = document.getElementById("messageInput").value;
 
-      console.log(333);
-
-      // "login-data"라는 이름의 채널로 객체를 보냄
-      socket.emit("chat message", { userId: "testUser", status: "online" });
+    document.getElementById('logoutBtn').addEventListener("click", () => {
+      window.localStorage.removeItem("fuzDataToken");
+      document.getElementById("welcomeTxt").innerText = "";
     });
   </script>
 </body>

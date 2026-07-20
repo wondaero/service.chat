@@ -4,6 +4,7 @@ import { initSocket } from "./socket"; // 분리한 소켓 모듈 임포트
 
 import userRouter from "./users/router"; // 작성한 함수 임포트
 import cors from "cors";
+import { setupSwagger } from "./swagger"; // Swagger 설정 임포트
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,11 +21,14 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Swagger UI 연결 (http://localhost:3000/api-docs)
+setupSwagger(app);
+
 app.use("/user", userRouter);
 
 // [중요] 여기서 소켓을 초기화해야 합니다!
 initSocket(httpServer);
 
 httpServer.listen(3000, () => {
-  console.log("채팅 서버가 http://localhost:3000 에서 실행 중입니다.");
+  console.log("서버가 http://localhost:3000 에서 실행 중입니다.");
 });
