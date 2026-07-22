@@ -11,15 +11,6 @@ const router = Router();
 const pepper1 = process.env.PASSWORD_PEPPER1 || "";
 const pepper2 = process.env.PASSWORD_PEPPER2 || "";
 
-
-interface User {
-  account: string;
-  password: string;
-  phone: string;
-  dept?: string;
-  role?: string;
-}
-
 const getPepperedPw = (pw: string) => pepper1 + pw + pepper2;
 
 const remakePassword = async (pw: string) => {
@@ -47,7 +38,7 @@ const remakePassword = async (pw: string) => {
  *             properties:
  *               email:
  *                 type: string
- *                 example: test@company.com
+ *                 example: test@fuz.co.kr
  *               pw:
  *                 type: string
  *                 example: "1234"
@@ -57,15 +48,47 @@ const remakePassword = async (pw: string) => {
  *               phone:
  *                 type: string
  *                 example: 010-1234-5678
+ *               dept:
+ *                 type: string
+ *                 example: 개발본부
+ *               role:
+ *                 type: string
+ *                 example: 개발
  *     responses:
  *       201:
  *         description: 회원가입 완료 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 회원가입이 완료되었습니다.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 10
+ *                     email:
+ *                       type: string
+ *                       example: test@fuz.co.kr
+ *                     name:
+ *                       type: string
+ *                       example: 홍길동
+ *                     phone:
+ *                       type: string
+ *                       example: 010-1234-5678
+ *                     created_at:
+ *                       type: string
+ *                       example: "2026-07-21T15:20:00.000Z"
  *       400:
  *         description: 필수 정보 입력 누락
  *       409:
  *         description: 이미 사용 중인 이메일
  */
-//회원가입
+//회원가입(유저가 가입)
 router.post("/signup", async (req, res) => {
   const { email, pw, name, phone, dept, role } = req.body;
   if (!email || !pw || !name || !phone) {
@@ -81,11 +104,12 @@ router.post("/signup", async (req, res) => {
     const insertQuery = `
       INSERT INTO users (email, password, name, phone, dept, role)
       VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, email, name, phone, created_at
     `;
 
-    await pool.query(insertQuery, [email, await remakePassword(pw), name, phone, dept || null, role || null]);
+    const newUser = await pool.query(insertQuery, [email, await remakePassword(pw), name, phone, dept || null, role || null]);
 
-    return res.status(201).json({ message: "회원가입이 완료되었습니다." });
+    return res.status(201).json({ message: "회원가입이 완료되었습니다.", data: newUser.rows[0] });
   } catch (err) {
     console.log('회원가입 에러:', err);
     return res.status(500).json({ message: "서버 오류가 발생했습니다." })
@@ -117,14 +141,59 @@ router.post("/signup", async (req, res) => {
  *     responses:
  *       200:
  *         description: 로그인 성공 및 토큰 반환
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 성공적으로 로그인했습니다.
+ *                 token:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbiIsIm5hbWUiOiLqsIDrppzsjbAiLCJhdXRoIjoiQURNSU4ifQ...
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     email:
+ *                       type: string
+ *                       example: admin
+ *                     name:
+ *                       type: string
+ *                       example: 관리자
+ *                     auth:
+ *                       type: string
+ *                       example: ADMIN
+ *                     phone:
+ *                       type: string
+ *                       example: 010-0000-0000
+ *                     dept:
+ *                       type: string
+ *                       example: 경영기획팀
+ *                     role:
+ *                       type: string
+ *                       example: 기획
+ *                     level:
+ *                       type: string
+ *                       example: 초급
+ *                     position:
+ *                       type: string
+ *                       example: 사원
+ *                     monthly_cost:
+ *                       type: integer
+ *                       example: 1000000
+ *                     status:
+ *                       type: string
+ *                       example: 재직
  *       401:
  *         description: 아이디 또는 비밀번호 불일치
  */
 //로그인
 router.post("/login", async (req, res) => {
   const { email, pw } = req.body;
-
-  console.log(11, req.body)
 
   // 1. 데이터 검증 (입력값이 없는 경우)
   if (!email || !pw) {
@@ -136,10 +205,8 @@ router.post("/login", async (req, res) => {
 
     const validUser = userCheck.rows[0];
 
-    console.log(validUser);
-
     if (!validUser) {
-      return res.status(401).json({ message: "아이디 또는 비밀번호가 잘못되었습니다." });
+      return res.status(401).json({ message: "아이디 또는 비밀번호가 잘못되었습니다2." });
     }
 
     const isMatch = await bcrypt.compare(getPepperedPw(pw), validUser.password);
@@ -147,7 +214,13 @@ router.post("/login", async (req, res) => {
     if (isMatch) {
       // JWT 발행
       const token = jwt.sign(
-        { id: validUser.id, name: validUser.name, auth: validUser.auth }, // 페이로드
+        {
+          id: validUser.id,
+          email: validUser.email,
+          name: validUser.name,
+          auth: validUser.auth,
+          dept: validUser.dept
+        }, // 페이로드
         SECRET_KEY, // 시크릿 키
         { expiresIn: "1h" }, // 유효시간 1시간
       );
@@ -165,42 +238,309 @@ router.post("/login", async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /user/{userId}:
+ *   patch:
+ *     summary: 유저 정보 수정 (관리자 또는 본인)
+ *     tags: [Users & Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: update@fuz.co.kr
+ *               password:
+ *                 type: string
+ *                 example: "1234"
+ *               auth:
+ *                 type: string
+ *                 example: ADMIN
+ *               name:
+ *                 type: string
+ *                 example: 홍길동
+ *               phone:
+ *                 type: string
+ *                 example: 010-9999-8888
+ *               dept:
+ *                 type: string
+ *                 example: 경영기획팀
+ *               role:
+ *                 type: string
+ *                 example: 기획
+ *               level:
+ *                 type: string
+ *                 example: 고급
+ *               position:
+ *                 type: string
+ *                 example: 과장
+ *               monthly_cost:
+ *                 type: integer
+ *                 example: 5000000
+ *               status:
+ *                 type: string
+ *                 example: 재직
+ *               note:
+ *                 type: string
+ *                 example: 특이사항 없음
+ *     responses:
+ *       200:
+ *         description: 유저 정보 수정 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 성공적으로 수정되었습니다.
+ *       400:
+ *         description: 수정할 정보가 없거나 잘못된 입력
+ *       403:
+ *         description: 수정 권한 없음
+ *       404:
+ *         description: 유저를 찾을 수 없음
+ */
 //유저정보 변경(비밀번호 포함)
-router.patch("/:userId", authMiddleware, (req, res) => { });
+router.patch("/:userId", authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  const { email, password, auth, name, phone, dept, role, level, position, monthly_cost, status, note } = req.body;
+  const userAuth = (req as any).user?.auth;
+  const currentUserId = (req as any).user?.id;
 
+  const conditions: string[] = [];
+  const values: any[] = [];
+
+  const addUpdateCol = (obj: Record<string, any>, only?: string[]) => {
+    const colName = Object.keys(obj)[0];
+    const val = Object.values(obj)[0];
+
+    if (val == undefined) return;
+
+    let valid = true;
+
+    only?.forEach((allowAuth) => {
+      if (allowAuth === 'admin' && userAuth !== 'ADMIN') {
+        valid = false;
+      }
+      if (allowAuth === 'self' && Number(currentUserId) !== Number(userId)) {
+        valid = false;
+      }
+    })
+
+    if (!valid) return;
+
+    values.push(val);
+    conditions.push(`${colName} = $${values.length}`);
+  }
+
+  try {
+    if (userAuth !== "ADMIN" && Number(userId) !== Number(currentUserId)) {
+      return res.status(403).json({ message: "수정 권한이 없습니다." });
+    }
+
+    addUpdateCol({ email }, ['admin', 'self']);
+    if (password) {
+      const hashedPassword = await remakePassword(password); // 🔒 비번 변경 시 bcrypt 암호화!
+      addUpdateCol({ password: hashedPassword }, ['admin', 'self']);
+    }
+    addUpdateCol({ auth }, ['admin']);
+    addUpdateCol({ name }, ['admin', 'self']);
+    addUpdateCol({ phone }, ['admin', 'self']);
+    addUpdateCol({ dept }, ['admin']);
+    addUpdateCol({ role }, ['admin']);
+    addUpdateCol({ level }, ['admin']);
+    addUpdateCol({ position }, ['admin']);
+    addUpdateCol({ monthly_cost }, ['admin']);
+    addUpdateCol({ status }, ['admin']);
+    addUpdateCol({ note }, ['admin']);
+
+    if (!values.length) {
+      return res.status(400).json({ message: " 수정할 정보가 없습니다." })
+    }
+
+    // 🎯 쿼리 실행 직전에 userId를 values 배열 맨 뒤에 추가!
+    values.push(userId);
+
+
+    const updateQuery = `UPDATE users SET ${conditions.join(", ")} WHERE id = $${values.length}`
+
+    await pool.query(updateQuery, values);
+    return res.status(200).json({ message: "성공적으로 수정되었습니다." });
+  } catch (err) {
+    console.log("유저 수정 에러:", err);
+    return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+  }
+});
+
+/**
+ * @openapi
+ * /user/{userId}:
+ *   delete:
+ *     summary: 유저 계정 삭제 / 퇴사 처리 (관리자 전용)
+ *     tags: [Users & Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: 유저 삭제 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 유저가 성공적으로 삭제되었습니다.
+ *       403:
+ *         description: 삭제 권한 없음
+ *       404:
+ *         description: 유저를 찾을 수 없음
+ */
 //유저 삭제
-router.delete("/:userId", authMiddleware, (req, res) => { });
+router.delete("/:userId", authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  const currentUserAuth = (req as any).user?.auth;
+  const currentUserId = (req as any).user?.id;
+
+  if (Number(userId) === Number(currentUserId)) {
+    return res.status(403).json({ message: "본인은 삭제할 수 없습니다." });
+  }
+
+  try {
+    if (currentUserAuth !== 'ADMIN') {
+      return res.status(403).json({ message: "삭제 권한이 없습니다." });
+    }
+
+    const userCheck = await pool.query("SELECT * FROM users WHERE id = $1", [userId]);
+    if (userCheck.rows.length === 0) return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
+
+    const deleteQuery = "DELETE FROM users WHERE id = $1";
+    await pool.query(deleteQuery, [userId]);
+
+    return res.status(200).json({ message: "유저가 성공적으로 삭제되었습니다." });
+
+  } catch (err) {
+    console.log("유저 삭제 에러:", err)
+    return res.status(500).json({ message: "서버 오류가 발생했습니다." })
+  }
+});
 
 /**
  * @openapi
  * /user:
  *   get:
- *     summary: 유저 목록 조회
+ *     summary: 유저 목록 조회 (검색 필터 포함)
  *     tags: [Users & Auth]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         example: 홍길동
+ *       - in: query
+ *         name: email
+ *         schema:
+ *           type: string
+ *         example: aa@fuz.co.kr
+ *       - in: query
+ *         name: phone
+ *         schema:
+ *           type: string
+ *         example: 010-0000-0000
+ *       - in: query
+ *         name: dept
+ *         schema:
+ *           type: string
+ *         example: 인사팀
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         example: 기획
+ *       - in: query
+ *         name: level
+ *         schema:
+ *           type: string
+ *         example: 고급
+ *       - in: query
+ *         name: position
+ *         schema:
+ *           type: string
+ *         example: 대리
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         example: 재직
  *     responses:
  *       200:
- *         description: 유저 목록 반환
+ *         description: 유저 목록 반환 성공
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   name:
- *                     type: string
- *                   email:
- *                     type: string
- *                   dept:
- *                     type: string
- *                   role:
- *                     type: string
- *                   status:
- *                     type: string
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: 유저 목록 조회가 완료되었습니다.
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                         example: 1
+ *                       email:
+ *                         type: string
+ *                         example: aa@fuz.co.kr
+ *                       name:
+ *                         type: string
+ *                         example: 김인사
+ *                       phone:
+ *                         type: string
+ *                         example: 010-0000-0000
+ *                       dept:
+ *                         type: string
+ *                         example: 인사팀
+ *                       role:
+ *                         type: string
+ *                         example: 기획
+ *                       level:
+ *                         type: string
+ *                         example: 고급
+ *                       position:
+ *                         type: string
+ *                         example: 대리
+ *                       monthly_cost:
+ *                         type: integer
+ *                         example: 1000000
+ *                       status:
+ *                         type: string
+ *                         example: 재직
  */
 //유저 목록
 router.get("/", authMiddleware, async (req, res) => {
@@ -221,7 +561,6 @@ router.get("/", authMiddleware, async (req, res) => {
       }
     }
 
-
     addWhere({ name });
     addWhere({ email });
     addWhere({ phone });
@@ -231,11 +570,12 @@ router.get("/", authMiddleware, async (req, res) => {
     addWhere({ position });
     addWhere({ status });
 
-
     const whereSql = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
     const userList = await pool.query(`SELECT * FROM users ${whereSql} ORDER BY name ASC`, values);
 
     const currentUserAuth = (req as any).user?.auth;
+
+    console.log(currentUserAuth);
 
     let resultData = userList.rows;
     if (currentUserAuth !== 'ADMIN') {
@@ -275,44 +615,85 @@ router.get("/", authMiddleware, async (req, res) => {
  *         example: 1
  *     responses:
  *       200:
- *         description: 유저 상세 정보 반환
+ *         description: 유저 상세 정보 반환 성공
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 id:
- *                   type: integer
- *                 name:
+ *                 message:
  *                   type: string
- *                 email:
- *                   type: string
- *                 phone:
- *                   type: string
- *                 dept:
- *                   type: string
- *                 role:
- *                   type: string
- *                 level:
- *                   type: string
- *                 position:
- *                   type: string
- *                 monthly_cost:
- *                   type: integer
- *                 status:
- *                   type: string
- *                 note:
- *                   type: string
+ *                   example: 유저 상세정보를 성공적으로 가져왔습니다.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                       example: 1
+ *                     email:
+ *                       type: string
+ *                       example: admin
+ *                     name:
+ *                       type: string
+ *                       example: 관리자
+ *                     phone:
+ *                       type: string
+ *                       example: 010-0000-0000
+ *                     dept:
+ *                       type: string
+ *                       example: 경영기획팀
+ *                     role:
+ *                       type: string
+ *                       example: 기획
+ *                     level:
+ *                       type: string
+ *                       example: 초급
+ *                     position:
+ *                       type: string
+ *                       example: 사원
+ *                     monthly_cost:
+ *                       type: integer
+ *                       example: 1000000
+ *                     status:
+ *                       type: string
+ *                       example: 재직
+ *                     note:
+ *                       type: string
+ *                       example: 테스트
+ *       404:
+ *         description: 유저를 찾을 수 없음
  */
 //유저 상세 정보
-router.get("/:userId", authMiddleware, (req, res) => {
-  return {
-    이름: "abc",
-    연락처: "010-0000-0000",
-    부서: "파트",
-    직책: "직책",
-    상태: "휴가중",
-  };
+router.get("/:userId", authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const resultUser = await pool.query(`SELECT * FROM users WHERE id = $1`, [userId]);
+
+
+    if (resultUser.rows.length === 0) {
+      return res.status(404).json({ message: "유저를 찾을 수 없습니다." });
+    }
+
+    let resultData;
+
+    const currentUserId = (req as any).user?.id;
+    const currentUserAuth = (req as any).user?.auth;
+
+    if (Number(currentUserId) === Number(userId) || currentUserAuth === 'ADMIN') {
+      const { password, ...safeData } = resultUser.rows[0];
+      resultData = safeData;
+    } else {
+      const { password, monthly_cost, level, ...safeData } = resultUser.rows[0];
+      resultData = safeData;
+    }
+
+    return res.status(200).json({ message: "유저 상세정보를 성공적으로 가져왔습니다.", data: resultData });
+  } catch (err) {
+    return res.status(500).json({ message: "서버 오류가 발생했습니다." })
+  }
+
+
 });
 
 export default router;

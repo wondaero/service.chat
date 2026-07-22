@@ -35,7 +35,7 @@ const userTable = `
         level VARCHAR(50),         -- 등급 (초급, 중급, 고급, 특급)
         position VARCHAR(50),      -- 직급 (사원, 선임, 수석, 팀장 등)
         monthly_cost INT DEFAULT 0, -- 월 인건비/원가
-        status VARCHAR(50) DEFAULT '재직', -- 상태 (재직, 휴직, 퇴사)
+        status VARCHAR(50) DEFAULT 'ACTIVE', -- 상태 (ACTIVE, ON_LEAVE, RETIRED)
         note TEXT,                 -- 비고
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -52,9 +52,14 @@ const projectsTable = `
         start_date DATE NOT NULL,
         end_date DATE NOT NULL,
         budget BIGINT DEFAULT 0,        -- 수주 금액/예산
-        progress_rate INT DEFAULT 0,    -- 진행률 (%)
         status VARCHAR(50) DEFAULT '진행중', -- 상태 (대기, 진행중, 완료)
+        required_planner INT DEFAULT 0, -- 필요한 기획자
+        required_designer INT DEFAULT 0, -- 필요한 디자이너
+        required_publisher INT DEFAULT 0, -- 필요한 퍼블리셔
+        required_developer INT DEFAULT 0, -- 필요한 개발자
+        required_etc INT DEFAULT 0, -- 기타 필요한 인력
         note TEXT,                      -- 비고 / 메모 / 특이사항
+        created_by INT REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -73,6 +78,22 @@ const participantsTable = `
         role VARCHAR(50),                             -- 투입 역할
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`;
+
+// 화면 및 세부 기능 단위 권한 관리 테이블 (UI 01~05 세부 권한 반영)
+const screenPermissionsTable = `
+    CREATE TABLE screen_permissions (
+        id SERIAL PRIMARY KEY,
+        screen_id VARCHAR(50) NOT NULL,      -- 화면 ID (예: 'USER_LIST', 'PROJECT_DETAIL')
+        feature_code VARCHAR(50) NOT NULL,   -- 기능 코드 (예: 'BTN_CREATE_USER', 'COL_MONTHLY_COST')
+        feature_name VARCHAR(100) NOT NULL,  -- 기능 이름 (예: '직원 등록 버튼', '원가 컬럼')
+        description TEXT,                    -- 기능 설명
+        allow_admin BOOLEAN DEFAULT TRUE,    -- admin 허용 여부 (true/false)
+        allow_user BOOLEAN DEFAULT FALSE,    -- user 허용 여부 (true/false)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (screen_id, feature_code)
     );
 `;
 
@@ -96,55 +117,62 @@ const insertSeedDataQuery = `
     -- 부서
     INSERT INTO masters (category, code, code_name)
     VALUES
-    ('DEPT', '0101', '경영기획팀'),
-    ('DEPT', '0102', '인사팀'),
-    ('DEPT', '0103', '재무팀'),
-    ('DEPT', '0104', '영업팀'),
-    ('DEPT', '0105', 'IT팀'),
-    ('DEPT', '0106', '마케팅팀'),
-    ('DEPT', '0107', '디자인팀');
+    ('DEPT', 'PLANNING', '경영기획팀'),
+    ('DEPT', 'HR', '인사팀'),
+    ('DEPT', 'FINANCE', '재무팀'),
+    ('DEPT', 'SALES', '영업팀'),
+    ('DEPT', 'IT', 'IT팀'),
+    ('DEPT', 'MARKETING', '마케팅팀'),
+    ('DEPT', 'DESIGN', '디자인팀');
 
     -- 직급
     INSERT INTO masters (category, code, code_name)
     VALUES
-    ('POSITION', '0201', '대표'),
-    ('POSITION', '0202', '부대표'),
-    ('POSITION', '0203', '전무'),
-    ('POSITION', '0204', '상무'),
-    ('POSITION', '0205', '부장'),
-    ('POSITION', '0206', '차장'),
-    ('POSITION', '0207', '과장'),
-    ('POSITION', '0208', '대리'),
-    ('POSITION', '0209', '사원');
+    ('POSITION', 'CEO', '대표'),
+    ('POSITION', 'V_PRESIDENT', '부대표'),
+    ('POSITION', 'EX_DIRECTOR', '전무'),
+    ('POSITION', 'DIRECTOR', '상무'),
+    ('POSITION', 'GENERAL_MGR', '부장'),
+    ('POSITION', 'DEPUTY_MGR', '차장'),
+    ('POSITION', 'MANAGER', '과장'),
+    ('POSITION', 'ASSISTANT', '대리'),
+    ('POSITION', 'STAFF', '사원');
 
     -- 직군
     INSERT INTO masters (category, code, code_name)
     VALUES
-    ('ROLE', '0301', '기획'),
-    ('ROLE', '0302', '디자인'),
-    ('ROLE', '0303', '퍼블'),
-    ('ROLE', '0304', '개발');
+    ('ROLE', 'PLANNER', '기획'),
+    ('ROLE', 'DESIGNER', '디자인'),
+    ('ROLE', 'PUBLISHER', '퍼블'),
+    ('ROLE', 'DEVELOPER', '개발');
 
     -- 등급
     INSERT INTO masters (category, code, code_name)
     VALUES
-    ('LEVEL', '0401', '초급'),
-    ('LEVEL', '0402', '중급'),
-    ('LEVEL', '0403', '고급'),
-    ('LEVEL', '0404', '특급');
+    ('LEVEL', 'JUNIOR', '초급'),
+    ('LEVEL', 'MID', '중급'),
+    ('LEVEL', 'SENIOR', '고급'),
+    ('LEVEL', 'EXPERT', '특급');
 
     -- 유저
     INSERT INTO users (email, password, auth, name, phone, dept, role, level, position, monthly_cost, status, note)
     VALUES
-    ('admin','0000','ADMIN','관리자','010-0000-0000','경영기획팀','기획','초급','사원',1000000,'재직','테스트'),
-    ('aa@fuz.co.kr','0000','USER','김인사','010-0000-0000','인사팀','기획','고급','대리',1000000,'재직','테스트'),
-    ('bb@fuz.co.kr','0000','USER','이재무','010-0000-0000','재무팀','디자인','중급','과장',1000000,'재직','테스트'),
-    ('cc@fuz.co.kr','0000','USER','박영업','010-0000-0000','영업팀','퍼블','특급','부장',1000000,'재직','테스트'),
-    ('dd@fuz.co.kr','0000','USER','최마케','010-0000-0000','마케팅팀','개발','초급','사원',1000000,'휴직','테스트'),
-    ('ee@fuz.co.kr','0000','USER','강디자인','010-0000-0000','디자인팀','기획','고급','차장',1000000,'재직','테스트'),
-    ('ff@fuz.co.kr','0000','USER','정IT','010-0000-0000','IT팀','디자인','초급','사원',1000000,'재직','테스트'),
-    ('gg@fuz.co.kr','0000','USER','오기획','010-0000-0000','경영기획팀','퍼블','중급','대리',1000000,'재직','테스트'),
-    ('hh@fuz.co.kr','0000','USER','신개발','010-0000-0000','개발팀','개발','고급','과장',1000000,'재직','테스트');
+    ('admin','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','SUPERADMIN','관리자','010-0000-0000','PLANNING','PLANNER','JUNIOR','STAFF',1000000,'ACTIVE','테스트'),
+    ('aa@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','ADMIN','김인사','010-0000-0000','HR','PLANNER','SENIOR','ASSISTANT',1000000,'ACTIVE','테스트'),
+    ('bb@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','이재무','010-0000-0000','FINANCE','DESIGNER','MID','MANAGER',1000000,'ACTIVE','테스트'),
+    ('cc@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','박영업','010-0000-0000','SALES','PUBLISHER','EXPERT','GENERAL_MGR',1000000,'ACTIVE','테스트'),
+    ('dd@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','최마케','010-0000-0000','MARKETING','DEVELOPER','JUNIOR','STAFF',1000000,'ON_LEAVE','테스트'),
+    ('ee@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','강디자인','010-0000-0000','DESIGN','PLANNER','SENIOR','DEPUTY_MGR',1000000,'ACTIVE','테스트'),
+    ('ff@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','정IT','010-0000-0000','IT','DESIGNER','JUNIOR','STAFF',1000000,'ACTIVE','테스트'),
+    ('gg@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','오기획','010-0000-0000','PLANNING','PUBLISHER','MID','ASSISTANT',1000000,'ACTIVE','테스트'),
+    ('hh@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','신개발','010-0000-0000','IT','DEVELOPER','SENIOR','MANAGER',1000000,'ACTIVE','테스트');
+
+    -- 화면 세부 기능 권한 샘플 (UI 01 유저 목록 화면)
+    INSERT INTO screen_permissions (screen_id, feature_code, feature_name, description, allow_admin, allow_user)
+    VALUES
+    ('USER_LIST', 'BTN_CREATE_USER', '신규 유저 등록 버튼', '신규 직원을 등록하는 버튼', TRUE, FALSE),
+    ('USER_LIST', 'COL_MONTHLY_COST', '월 인건비/원가 컬럼', '목록 표 내부의 인건비 원가 컬럼', TRUE, FALSE),
+    ('USER_LIST', 'BTN_EXCEL_DOWNLOAD', '엑셀 다운로드 버튼', '유저 목록을 엑셀로 다운받는 버튼', TRUE, TRUE);
 `;
 
 async function initDb() {
@@ -158,6 +186,7 @@ async function initDb() {
             ${userTable}
             ${projectsTable}
             ${participantsTable}
+            ${screenPermissionsTable}
             /*${indexQueries}*/
             ${insertSeedDataQuery}
         `;

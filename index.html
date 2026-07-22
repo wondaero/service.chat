@@ -80,9 +80,69 @@
     </div>
     <p id="welcomeTxt"></p>
   </div>
+  <hr />
   <div>
     <h2>3. 로그아웃</h2>
     <button id="logoutBtn">로그아웃</button>
+  </div>
+  <hr />
+  <div>
+    <h2>5. 프로젝트 생성</h2>
+    <form id="projectForm" class="form-style" action="http://localhost:3000/project/" method="POST">
+      <label class="input-label ast">
+        <strong>프로젝트명</strong>
+        <input type="text" name="name" />
+      </label>
+      <label class="input-label ast">
+        <strong>발주처</strong>
+        <input type="text" name="client_name" />
+      </label>
+      <label class="input-label ast">
+        <strong>유형(나중에 selectbox로)</strong>
+        <input type="text" name="project_type" />
+      </label>
+      <label class="input-label ast">
+        <strong>진행상태(나중에 selectbox로)</strong>
+        <input type="text" name="status" />
+      </label>
+      <label class="input-label ast">
+        <strong>시작일</strong>
+        <input type="date" name="start_date" />
+      </label>
+      <label class="input-label ast">
+        <strong>종료일</strong>
+        <input type="date" name="end_date" />
+      </label>
+      <label class="input-label ast">
+        <strong>수주금액</strong>
+        <input type="text" name="budget" />
+      </label>
+      <label class="input-label">
+        <strong>필요인력(기획)</strong>
+        <input type="number" name="required_planner" />
+      </label>
+      <label class="input-label">
+        <strong>필요인력(디자인)</strong>
+        <input type="number" name="required_designer" />
+      </label>
+      <label class="input-label">
+        <strong>필요인력(퍼블리싱)</strong>
+        <input type="number" name="required_publisher" />
+      </label>
+      <label class="input-label">
+        <strong>필요인력(개발)</strong>
+        <input type="number" name="required_developer" />
+      </label>
+      <label class="input-label">
+        <strong>필요인력(기타)</strong>
+        <input type="number" name="required_etc" />
+      </label>
+      <label class="input-label">
+        <strong>특이사항</strong>
+        <textarea type="text" name="note"></textarea>
+      </label>
+      <button>프로젝트 생성</button>
+    </form>
   </div>
 
 
@@ -122,14 +182,63 @@
           window.localStorage.setItem("fuzDataToken", resData.token);
 
           document.getElementById("welcomeTxt").innerText = resData.data.name + "님 환영합니다.";
+          getUserList();
         });
     });
+
+    function getUserList() {
+      const token = window.localStorage.getItem("fuzDataToken");
+      if (!token) return;
+
+      fetch("http://localhost:3000/user", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+    }
 
 
     document.getElementById('logoutBtn').addEventListener("click", () => {
       window.localStorage.removeItem("fuzDataToken");
       document.getElementById("welcomeTxt").innerText = "";
     });
+
+    document.getElementById('projectForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // 2. 폼 안에 입력된 데이터들을 긁어 모읍니다.
+      const formData = new FormData(e.target);
+      const formPayload = Object.fromEntries(formData.entries());
+
+      const token = window.localStorage.getItem('fuzDataToken');
+
+      try {
+        const response = await fetch("http://localhost:3000/project", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` // 👈 헤더에 안전하게 토큰 탑재!
+          },
+          body: JSON.stringify(formPayload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          alert("프로젝트가 성공적으로 생성되었습니다!");
+          console.log("생성된 데이터:", result.data);
+        } else {
+          alert(`생성 실패: ${result.message}`);
+        }
+
+      } catch (error) {
+        console.error('API 요청 중 에러 발생:', error);
+        alert('알 수 없는 오류가 발생했습니다.');
+      }
+
+    })
   </script>
 </body>
 

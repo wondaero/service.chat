@@ -28,15 +28,16 @@ const options: swaggerJsdoc.Options = {
     },
   },
   apis: [
-    "./src/users/router.ts",
-    "./src/**/*.ts",
-    path.join(process.cwd(), "src/**/*.ts").replace(/\\/g, "/"),
+    path.resolve(process.cwd(), "src/users/router.ts").replace(/\\/g, "/"),
+    path.resolve(process.cwd(), "src/**/*.ts").replace(/\\/g, "/"),
+    path.resolve(__dirname, "./**/*.ts").replace(/\\/g, "/"),
   ], // Windows 경로 슬래시(/) 변환 매칭
 };
 
-const specs = swaggerJsdoc(options);
-
 export const setupSwagger = (app: Express) => {
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
+  app.use("/api-docs", swaggerUi.serve, (req: any, res: any, next: any) => {
+    const specs = swaggerJsdoc(options);
+    swaggerUi.setup(specs)(req, res, next);
+  });
   console.log("📑 Swagger API 문서 준비 완료: http://localhost:3000/api-docs");
 };

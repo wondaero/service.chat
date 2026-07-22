@@ -2,7 +2,9 @@ import express from "express";
 import { createServer } from "http";
 import { initSocket } from "./socket"; // 분리한 소켓 모듈 임포트
 
-import userRouter from "./users/router"; // 작성한 함수 임포트
+import userRouter from "./users/router"; // 유저 라우터
+import projectRouter from "./projects/router"; // 프로젝트 라우터
+import screenRouter from "./screens/router"; // 페이지 라우터
 import cors from "cors";
 import { setupSwagger } from "./swagger"; // Swagger 설정 임포트
 
@@ -25,6 +27,8 @@ app.use(cors(corsOptions));
 setupSwagger(app);
 
 app.use("/user", userRouter);
+app.use("/project", projectRouter);
+app.use("/screen", screenRouter);
 
 // [중요] 여기서 소켓을 초기화해야 합니다!
 initSocket(httpServer);

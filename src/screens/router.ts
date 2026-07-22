@@ -1,44 +1,42 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/authMiddleware";
-import pool from "../db";
+import pool from "../db"
+import { PROJECT_STATUS } from "../../common/constants";
 
 const router = Router();
 
 
 //로그인
-router.post("/", authMiddleware, async (req, res) => {
-    const userAuth = (req as any).user?.auth;
-    if (userAuth === 'USER') {
-        return res.status(403).json({ message: "현재권한으로는 프로젝트에 참여할 수 없습니다." });
-    }
-
-    const { project_id, user_id } = req.body;
-
-    if (!project_id || !user_id) {
-        return res.status(400).json({ message: "필수 값을 넣어주세요." });
-    }
-
-    const userId = (req as any).user?.id;
-
-    const targetProject = await pool.query("SELECT * FROM projects WHERE id = $1", [project_id]);
-
-    if (targetProject.rows.length === 0) {
-        return res.status(404).json({ message: "프로젝트를 찾을 수 없습니다." });
-    }
-
-    const createdBy = targetProject.rows[0].created_by;
-    if (Number(createdBy) !== Number(userId) && userAuth !== 'SUPERADMIN') {
-        return res.status(403).json({ message: "권한이 없습니다." });
-    }
-
-    const insertQuery = ``;
-
-
-
+router.post("/dashboard", authMiddleware, async (req, res) => {
     try {
-        const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+        const screenPermission = await pool.query("SELECT * FROM screen_permissions WHERE screen_id = 'dashboard'");
+        const projectQuery = `
+            SELECT pj.*,
+            COALESCE(
+                JSON_AGG(
+                    JSON_BUILD_OBJECT(
+                        id: pt.user_id, 
+                        mm_value: pt.mm_value,
+                        monthly_cost: pt.monthly_cost
+                        name: u.name
+                    )
+                ) FILTER (WHERE pt.id IS NOT NULL),
+                 '[]'::json
+            ) AS participants
+            FROM projects AS pj
+            LEFT JOIN participants AS pt
+            ON pj.id = pt.project_id
+            LEFT JOIN users as u
+            ON pt.user_id = u.id
+            WHERE pj.status != '${PROJECT_STATUS.COMPLETED}'
+            GROUP BY pj.id;
+        `;
+        const currentProject = await pool.query(projectQuery);
 
-        const validUser = userCheck.rows[0];
+
+
+
+        return;
 
         if (!validUser) {
             return res.status(401).json({ message: "아이디 또는 비밀번호가 잘못되었습니다2." });
