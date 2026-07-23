@@ -36,6 +36,7 @@ const userTable = `
         position VARCHAR(50),      -- 직급 (사원, 선임, 수석, 팀장 등)
         monthly_cost INT DEFAULT 0, -- 월 인건비/원가
         status VARCHAR(50) DEFAULT 'ACTIVE', -- 상태 (ACTIVE, ON_LEAVE, RETIRED)
+        is_approved BOOLEAN DEFAULT FALSE,  -- 가입 승인 여부 (기본값 FALSE)
         note TEXT,                 -- 비고
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -58,8 +59,9 @@ const projectsTable = `
         required_publisher INT DEFAULT 0, -- 필요한 퍼블리셔
         required_developer INT DEFAULT 0, -- 필요한 개발자
         required_etc INT DEFAULT 0, -- 기타 필요한 인력
-        note TEXT,                      -- 비고 / 메모 / 특이사항
         created_by INT REFERENCES users(id) ON DELETE SET NULL,
+        dept VARCHAR(50) NOT NULL,
+        note TEXT,                      -- 비고 / 메모 / 특이사항
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -76,6 +78,8 @@ const participantsTable = `
         mm_value NUMERIC(3, 2) NOT NULL DEFAULT 1.0, -- 투입 공수 (예: 0.5 M/M, 1.0 M/M)
         monthly_cost INT DEFAULT 0,                  -- 프로젝트 적용 월 인건비/단가
         role VARCHAR(50),                             -- 투입 역할
+        level VARCHAR(50),                            -- 투입 당시 등급 (예: JUNIOR, MID, SENIOR, EXPERT)
+        note TEXT,                                    -- 비고
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -155,21 +159,42 @@ const insertSeedDataQuery = `
     ('LEVEL', 'EXPERT', '특급');
 
     -- 유저
-    INSERT INTO users (email, password, auth, name, phone, dept, role, level, position, monthly_cost, status, note)
+    INSERT INTO users (email, password, auth, name, phone, dept, role, level, position, monthly_cost, status, is_approved, note)
     VALUES
-    ('admin','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','SUPERADMIN','관리자','010-0000-0000','PLANNING','PLANNER','JUNIOR','STAFF',1000000,'ACTIVE','테스트'),
-    ('aa@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','ADMIN','김인사','010-0000-0000','HR','PLANNER','SENIOR','ASSISTANT',1000000,'ACTIVE','테스트'),
-    ('bb@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','이재무','010-0000-0000','FINANCE','DESIGNER','MID','MANAGER',1000000,'ACTIVE','테스트'),
-    ('cc@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','박영업','010-0000-0000','SALES','PUBLISHER','EXPERT','GENERAL_MGR',1000000,'ACTIVE','테스트'),
-    ('dd@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','최마케','010-0000-0000','MARKETING','DEVELOPER','JUNIOR','STAFF',1000000,'ON_LEAVE','테스트'),
-    ('ee@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','강디자인','010-0000-0000','DESIGN','PLANNER','SENIOR','DEPUTY_MGR',1000000,'ACTIVE','테스트'),
-    ('ff@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','정IT','010-0000-0000','IT','DESIGNER','JUNIOR','STAFF',1000000,'ACTIVE','테스트'),
-    ('gg@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','오기획','010-0000-0000','PLANNING','PUBLISHER','MID','ASSISTANT',1000000,'ACTIVE','테스트'),
-    ('hh@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','신개발','010-0000-0000','IT','DEVELOPER','SENIOR','MANAGER',1000000,'ACTIVE','테스트');
+    ('admin','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','SUPERADMIN','관리자','010-0000-0000','PLANNING','PLANNER','JUNIOR','STAFF',1000000,'ACTIVE',TRUE,'테스트'),
+    ('aa@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','ADMIN','김인사','010-0000-0000','HR','PLANNER','SENIOR','ASSISTANT',1000000,'ACTIVE',TRUE,'테스트'),
+    ('bb@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','ADMIN','이재무','010-0000-0000','FINANCE','DESIGNER','MID','MANAGER',1000000,'ACTIVE',TRUE,'테스트'),
+    ('cc@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','박영업','010-0000-0000','SALES','PUBLISHER','EXPERT','GENERAL_MGR',1000000,'ACTIVE',TRUE,'테스트'),
+    ('dd@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','최마케','010-0000-0000','MARKETING','DEVELOPER','JUNIOR','STAFF',1000000,'ON_LEAVE',TRUE,'테스트'),
+    ('ee@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','강디자인','010-0000-0000','DESIGN','PLANNER','SENIOR','DEPUTY_MGR',1000000,'ACTIVE',TRUE,'테스트'),
+    ('ff@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','정IT','010-0000-0000','IT','DESIGNER','JUNIOR','STAFF',1000000,'ACTIVE',TRUE,'테스트'),
+    ('gg@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','오기획','010-0000-0000','PLANNING','PUBLISHER','MID','ASSISTANT',1000000,'ACTIVE',TRUE,'테스트'),
+    ('hh@fuz.co.kr','$2b$10$qG6mVKuW3g8ZShVxVRfDDeH9.ZBwUl5Wyz4xG8n7tnQ7xCKm0Ch86','USER','신개발','010-0000-0000','IT','DEVELOPER','SENIOR','MANAGER',1000000,'ACTIVE',TRUE,'테스트');
+
+
+    -- 프로젝트
+    INSERT INTO projects (name, client_name, project_type, start_date, end_date, budget, status, required_planner, required_designer, required_publisher, required_developer, required_etc, created_by, dept, note)
+    VALUES
+    ('테스트 프로젝트1', '테스터', '유지보수', '2026-07-16', '2026-07-30', 10000000, '대기', 1, 1, 1, 0, 0, 2, 'HR', '테스트 프로젝트1'),
+    ('테스트 프로젝트2', '테스터2', '유지보수', '2026-08-16', '2026-08-30', 8000000, '대기', 0, 1, 1, 1, 0, 2, 'HR', '테스트 프로젝트2');
+
+    --투입인원
+    INSERT INTO participants (project_id, user_id, start_date, end_date, mm_value, monthly_cost, role, level, note)
+    VALUES
+    (1, 1, '2026-01-01', '2026-01-31', 1.0, 3500000, 'PLANNER', 'SENIOR', '테스트'),
+    (1, 2, '2026-01-01', '2026-01-31', 0.5, 2000000, 'DEVELOPER', 'MID', '테스트'),
+    (1, 3, '2026-01-15', '2026-02-15', 1.0, 4000000, 'DESIGNER', 'EXPERT', '테스트'),
+
+    (2, 1, '2026-01-01', '2026-01-31', 1.0, 3500000, 'PLANNER', 'SENIOR', '테스트'),
+    (2, 4, '2026-01-01', '2026-01-31', 0.5, 2000000, 'DEVELOPER', 'MID', '테스트'),
+    (2, 5, '2026-01-15', '2026-02-15', 1.0, 4000000, 'DESIGNER', 'EXPERT', '테스트');
+
 
     -- 화면 세부 기능 권한 샘플 (UI 01 유저 목록 화면)
     INSERT INTO screen_permissions (screen_id, feature_code, feature_name, description, allow_admin, allow_user)
     VALUES
+    ('DASHBOARD', 'CREATEPROJECT_BTN', '새 프로젝트 등록', '신규 프로젝트 등록', TRUE, FALSE),
+    ('DASHBOARD', 'ALERTBOX', '알림 영역', '알림영역', TRUE, FALSE),
     ('USER_LIST', 'BTN_CREATE_USER', '신규 유저 등록 버튼', '신규 직원을 등록하는 버튼', TRUE, FALSE),
     ('USER_LIST', 'COL_MONTHLY_COST', '월 인건비/원가 컬럼', '목록 표 내부의 인건비 원가 컬럼', TRUE, FALSE),
     ('USER_LIST', 'BTN_EXCEL_DOWNLOAD', '엑셀 다운로드 버튼', '유저 목록을 엑셀로 다운받는 버튼', TRUE, TRUE);

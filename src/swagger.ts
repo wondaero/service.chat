@@ -28,10 +28,11 @@ const options: swaggerJsdoc.Options = {
     },
   },
   apis: [
-    path.resolve(process.cwd(), "src/users/router.ts").replace(/\\/g, "/"),
-    path.resolve(process.cwd(), "src/**/*.ts").replace(/\\/g, "/"),
-    path.resolve(__dirname, "./**/*.ts").replace(/\\/g, "/"),
-  ], // Windows 경로 슬래시(/) 변환 매칭
+    "./src/users/router.ts",
+    "./src/projects/router.ts",
+    "./src/participants/router.ts",
+    "./src/screens/router.ts",
+  ],
 };
 
 export const setupSwagger = (app: Express) => {
